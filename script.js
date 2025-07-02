@@ -215,7 +215,7 @@ class HandwritingToTurtle {
         let code = `!pip install ColabTurtle\n`;
         code += `from ColabTurtle.Turtle import *\n`;
         code += `import ColabTurtle.Turtle as t\n`;
-        code += `t.initializeTurtle(initial_speed=5)\n`;
+        code += `t.initializeTurtle(initial_speed=13)\n`;
         code += `t.hideturtle()\n`;
         code += `pensize(2)\n\n`;
         for (const letter of this.letters) {
@@ -275,23 +275,35 @@ const app = new HandwritingToTurtle();
 
 // --- Font to Turtle Graphics Only ---
 let loadedFont = null;
-document.getElementById('fontUpload').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        opentype.load(event.target.result, function(err, font) {
-            if (err) {
-                alert('Font could not be loaded: ' + err);
-                loadedFont = null;
-                document.getElementById('fontName').textContent = '';
-            } else {
-                loadedFont = font;
-                document.getElementById('fontName').textContent = font.names.fullName.en || file.name;
-            }
-        });
-    };
-    reader.readAsDataURL(file);
+
+// Load Kanit-Regular.ttf automatically on page load
+window.addEventListener('load', function() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const nameInput = document.getElementById('nameInput');
+    const generateBtn = document.querySelector('button[onclick="generateCode()"]');
+    
+    // Disable input while loading
+    nameInput.disabled = true;
+    generateBtn.disabled = true;
+    
+    opentype.load('./Kanit-Regular.ttf', function(err, font) {
+        // Hide loading indicator
+        loadingIndicator.classList.add('hidden');
+        
+        if (err) {
+            console.error('Font could not be loaded:', err);
+            alert('Could not load Kanit-Regular.ttf font. Please make sure the font file is in the same directory.');
+            loadedFont = null;
+        } else {
+            loadedFont = font;
+            console.log('Kanit-Regular font loaded successfully');
+            
+            // Enable input after successful loading
+            nameInput.disabled = false;
+            generateBtn.disabled = false;
+            nameInput.focus();
+        }
+    });
 });
 
 function getFontGlyphPaths(text, font, fontSize = 200) {
@@ -328,11 +340,11 @@ function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, m
         if (path.length > 0) {
             const start = path[0];
             commands.push(`    penup()`);
-            commands.push(`    goto(${Math.round(start.x * scale + offsetX + minXShift)}, ${Math.round(start.y * scale + offsetY + minYShift)})`);
+            commands.push(`    goto(${Math.round(start.x * scale + offsetX)}, ${Math.round(-start.y * scale + offsetY)})`);
             commands.push(`    pendown()`);
             for (let i = 1; i < path.length; i++) {
                 const pt = path[i];
-                commands.push(`    goto(${Math.round(pt.x * scale + offsetX + minXShift)}, ${Math.round(pt.y * scale + offsetY + minYShift)})`);
+                commands.push(`    goto(${Math.round(pt.x * scale + offsetX)}, ${Math.round(-pt.y * scale + offsetY)})`);
             }
             commands.push(`    penup()`);
         }
@@ -343,7 +355,7 @@ function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, m
 function generateCode() {
     const name = document.getElementById('nameInput').value.trim();
     if (!loadedFont) {
-        alert('Please upload a font file first!');
+        alert('Font is still loading. Please wait a moment and try again.');
         return;
     }
     if (!name) {
@@ -353,32 +365,39 @@ function generateCode() {
     let code = `!pip install ColabTurtle\n`;
     code += `from ColabTurtle.Turtle import *\n`;
     code += `import ColabTurtle.Turtle as t\n`;
-    code += `t.initializeTurtle(initial_speed=5)\n`;
+    code += `t.initializeTurtle(initial_speed=13)\n`;
     code += `t.hideturtle()\n`;
     code += `pensize(2)\n\n`;
     // Get paths and bounding box
     const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, loadedFont, 200);
-    // Centering offset
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    // Optionally scale to fit a 400x400 box (ColabTurtle default)
-    const width = maxX - minX;
-    const height = maxY - minY;
-    const scale = Math.min(350 / width, 350 / height, 1); // leave margin
-    // After centering, shift so minX/minY are 0 (or margin)
-    let shiftedMinX = Infinity, shiftedMinY = Infinity;
-    for (const path of paths) {
-        for (const pt of path) {
-            const sx = (pt.x - centerX) * scale;
-            const sy = (pt.y - centerY) * scale;
-            if (sx < shiftedMinX) shiftedMinX = sx;
-            if (sy < shiftedMinY) shiftedMinY = sy;
-        }
-    }
-    const margin = 25;
-    const minXShift = -shiftedMinX + margin;
-    const minYShift = -shiftedMinY + margin;
-    const commands = fontPathsToTurtleCommands(paths, scale, -centerX * scale, -centerY * scale, minXShift, minYShift);
+    
+    // Calculate text dimensions
+    const textWidth = maxX - minX;
+    const textHeight = maxY - minY;
+    
+    // Scale to fit within a reasonable size (leaving margins)
+    const canvasWidth = 400;
+    const canvasHeight = 400;
+    const margin = 50;
+    const availableWidth = canvasWidth - (2 * margin);
+    const availableHeight = canvasHeight - (2 * margin);
+    
+    const scale = Math.min(availableWidth / textWidth, availableHeight / textHeight, 1);
+    
+    // Calculate final text dimensions after scaling
+    const scaledWidth = textWidth * scale;
+    const scaledHeight = textHeight * scale;
+    
+    // Center the text in the canvas
+    const startX = (canvasWidth - scaledWidth) / 2;
+    const startY = (canvasHeight - scaledHeight) / 2;
+    
+    // ColabTurtle uses screen coordinates with (0,0) at center
+    // Convert to ColabTurtle coordinate system
+    const centerOffsetX = startX - (canvasWidth / 2);
+    const centerOffsetY = (canvasHeight / 2) - startY - scaledHeight;
+    
+    const commands = fontPathsToTurtleCommands(paths, scale, -minX * scale + centerOffsetX, -minY * scale + centerOffsetY, 0, 0);
     code += `def draw_name():\n`;
     code += `    """Draw the name: ${name} centered in the window"""\n`;
     if (commands.length === 0) {
