@@ -334,17 +334,39 @@ function getFontGlyphPaths(text, font, fontSize = 200) {
     return { paths, minX, minY, maxX, maxY };
 }
 
-function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, fillLetters = false) {
+function simplifyPathToCenterLine(path, simplificationFactor = 0.3) {
+    if (path.length <= 2) return path;
+    
+    // Take fewer points to create a center-line effect
+    const simplified = [];
+    const step = Math.max(1, Math.floor(path.length * simplificationFactor));
+    
+    for (let i = 0; i < path.length; i += step) {
+        simplified.push(path[i]);
+    }
+    
+    // Always include the last point
+    if (simplified[simplified.length - 1] !== path[path.length - 1]) {
+        simplified.push(path[path.length - 1]);
+    }
+    
+    return simplified;
+}
+
+function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, useThickStrokes = false) {
     const commands = [];
     
-    if (fillLetters && paths.length > 0) {
-        // For filled letters, we need to group all paths and fill them together
+    if (useThickStrokes) {
+        // Use thick pen width to simulate filled letters
+        commands.push(`    width(20)  # Thick stroke for filled effect`);
         commands.push(`    color('black')`);
-        commands.push(`    begin_fill()`);
         
         for (const path of paths) {
             if (path.length > 0) {
-                const start = path[0];
+                // Simplify path to create center-line effect
+                const centerPath = simplifyPathToCenterLine(path, 0.4);
+                
+                const start = centerPath[0];
                 const startX = Math.max(0, Math.round(start.x * scale + offsetX));
                 const startY = Math.max(0, Math.round(start.y * scale + offsetY));
                 
@@ -352,25 +374,15 @@ function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, f
                 commands.push(`    goto(${startX}, ${startY})`);
                 commands.push(`    pendown()`);
                 
-                for (let i = 1; i < path.length; i++) {
-                    const pt = path[i];
+                for (let i = 1; i < centerPath.length; i++) {
+                    const pt = centerPath[i];
                     const x = Math.max(0, Math.round(pt.x * scale + offsetX));
                     const y = Math.max(0, Math.round(pt.y * scale + offsetY));
                     commands.push(`    goto(${x}, ${y})`);
                 }
-                
-                // Close the path for proper filling
-                if (path.length > 2) {
-                    const firstPoint = path[0];
-                    const firstX = Math.max(0, Math.round(firstPoint.x * scale + offsetX));
-                    const firstY = Math.max(0, Math.round(firstPoint.y * scale + offsetY));
-                    commands.push(`    goto(${firstX}, ${firstY})`);
-                }
+                commands.push(`    penup()`);
             }
         }
-        
-        commands.push(`    end_fill()`);
-        commands.push(`    penup()`);
     } else {
         // Original outline-only code
         for (const path of paths) {
@@ -400,7 +412,7 @@ function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, f
 function generateCode() {
     const name = document.getElementById('nameInput').value.trim();
     const useCustomSize = document.getElementById('customSizeCheckbox').checked;
-    const fillLetters = document.getElementById('fillLettersCheckbox').checked;
+    const useThickStrokes = document.getElementById('fillLettersCheckbox').checked;
     
     if (!loadedFont) {
         alert('Font is still loading. Please wait a moment and try again.');
@@ -468,18 +480,18 @@ function generateCode() {
     }
     
     code += `t.hideturtle()\n`;
-    if (!fillLetters) {
+    if (!useThickStrokes) {
         code += `pensize(2)\n`;
     }
     code += `\n`;
     
-    const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY, fillLetters);
+    const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY, useThickStrokes);
     code += `def draw_name():\n`;
     
     if (useCustomSize) {
-        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${fillLetters ? ', filled' : ', outline'})"""\n`;
+        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${useThickStrokes ? ', thick strokes' : ', outline'})"""\n`;
     } else {
-        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${fillLetters ? ', filled' : ', outline'})"""\n`;
+        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${useThickStrokes ? ', thick strokes' : ', outline'})"""\n`;
     }
     if (commands.length === 0) {
         code += `    pass  # No drawing data\n`;
