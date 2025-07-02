@@ -412,8 +412,8 @@ function generateCode() {
     // Choose the appropriate font based on the thick strokes option
     const selectedFont = useThickStrokes ? loadedThinFont : loadedFont;
     
-    // Get paths and bounding box first
-    const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, selectedFont, 200);
+    // Get paths and bounding box for the whole name (for scaling/canvas)
+    const { minX, minY, maxX, maxY } = getFontGlyphPaths(name, selectedFont, 200);
     
     let code = `!pip install ColabTurtle\n`;
     code += `from ColabTurtle.Turtle import *\n`;
@@ -425,69 +425,90 @@ function generateCode() {
         // Calculate text dimensions
         const textWidth = maxX - minX;
         const textHeight = maxY - minY;
-        
-        // Add margin around the text
         const margin = 50;
         canvasWidth = Math.max(400, Math.ceil(textWidth + (2 * margin)));
-        // Reduce height by using a smaller proportion of the text height for better visual balance
         canvasHeight = Math.max(300, Math.ceil(textHeight * 0.6 + (2 * margin)));
-        
         code += `# Set up custom canvas size to fit the name perfectly\n`;
         code += `t.initializeTurtle(initial_window_size=(${canvasWidth}, ${canvasHeight}), initial_speed=13)\n`;
-        
-        // No scaling needed since canvas fits the text
         scale = 1;
-        
-        // Center the text by calculating offsets
         offsetX = margin - minX;
         offsetY = margin - minY;
     } else {
-        // Use default ColabTurtle canvas size (400x400)
         canvasWidth = 400;
         canvasHeight = 400;
         const margin = 50;
         const availableWidth = canvasWidth - (2 * margin);
         const availableHeight = canvasHeight - (2 * margin);
-        
         code += `# Using default ColabTurtle canvas size\n`;
         code += `t.initializeTurtle(initial_speed=13)\n`;
-        
-        // Calculate text dimensions
         const textWidth = maxX - minX;
         const textHeight = maxY - minY;
-        
-        // Scale to fit within available space
         scale = Math.min(availableWidth / textWidth, availableHeight / textHeight, 1);
-        
-        // Calculate scaled dimensions
         const scaledWidth = textWidth * scale;
         const scaledHeight = textHeight * scale;
-        
-        // Center the text by calculating offsets
         offsetX = (canvasWidth - scaledWidth) / 2 - minX * scale;
         offsetY = (canvasHeight - scaledHeight) / 2 - minY * scale;
     }
-    
     code += `t.hideturtle()\n`;
     if (!useThickStrokes) {
         code += `pensize(2)\n`;
     }
     code += `\n`;
-    
-    const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY, useThickStrokes);
+
+    // Generate a function for each letter
+    let letterFns = [];
+    let letterCalls = [];
+    let xCursor = 0;
+    for (let i = 0; i < name.length; i++) {
+        const letter = name[i];
+        const glyph = selectedFont.charToGlyph(letter);
+        const glyphPath = glyph.getPath(xCursor, 200, 200);
+        // Get only this letter's paths
+        let currentPath = [];
+        let paths = [];
+        for (const cmd of glyphPath.commands) {
+            if (cmd.type === 'M' || cmd.type === 'L' || cmd.type === 'Q' || cmd.type === 'C') {
+                currentPath.push({x: cmd.x, y: cmd.y});
+            } else if (cmd.type === 'Z') {
+                if (currentPath.length > 0) {
+                    paths.push(currentPath);
+                    currentPath = [];
+                }
+            }
+        }
+        if (currentPath.length > 0) paths.push(currentPath);
+        // Calculate offset for this letter
+        let letterOffsetX = offsetX;
+        let letterOffsetY = offsetY;
+        // Generate function name
+        let fnName = /^[a-zA-Z]$/.test(letter) ? `draw_${letter.toLowerCase()}` : `draw_char_${letter.charCodeAt(0)}`;
+        letterCalls.push(`    ${fnName}()`);
+        // Generate commands for this letter
+        let commands = fontPathsToTurtleCommands(paths, scale, letterOffsetX, letterOffsetY, useThickStrokes);
+        let fnCode = `def ${fnName}():\n`;
+        fnCode += `    """Draw letter '${letter}'"""\n`;
+        if (commands.length === 0) {
+            fnCode += `    pass  # No drawing data for this letter\n`;
+        } else {
+            for (const command of commands) {
+                fnCode += `${command}\n`;
+            }
+        }
+        letterFns.push(fnCode);
+        // Advance xCursor for next letter
+        xCursor += glyph.advanceWidth * (200 / selectedFont.unitsPerEm);
+    }
+    // Output all letter functions
+    code += letterFns.join('\n') + '\n';
+    // Main function to call all letter functions in order
     code += `def draw_name():\n`;
-    
     if (useCustomSize) {
         code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
     } else {
         code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
     }
-    if (commands.length === 0) {
-        code += `    pass  # No drawing data\n`;
-    } else {
-        for (const command of commands) {
-            code += `${command}\n`;
-        }
+    for (const call of letterCalls) {
+        code += call + '\n';
     }
     code += `\ndraw_name()\n`;
     document.getElementById('generatedCode').textContent = code;
