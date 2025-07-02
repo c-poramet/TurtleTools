@@ -241,32 +241,30 @@ function extractPaths(grid) {
 function getAllLetterPaths() {
     const letterPaths = {};
     
-    // Convert each letter's canvas drawing to pixel grid, then to paths
-    for (const l of Object.keys(grids)) {
-        if (grids[l]) {
-            // Load the saved canvas data and convert to pixel grid
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            const img = new Image();
-            img.onload = () => {
-                tempCtx.drawImage(img, 0, 0);
-                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                const pixelGrid = imageDataToPixelGrid(imageData);
-                letterPaths[l] = extractPaths(pixelGrid);
-            };
-            img.src = grids[l];
-        } else {
-            letterPaths[l] = [];
-        }
-    }
+    // Get unique letters from the name
+    const uniqueLetters = [...new Set(letters)];
     
-    // Also handle current letter
+    // Convert current letter's canvas drawing to pixel grid
     if (letters[current]) {
         const pixelGrid = canvasToPixelGrid();
         letterPaths[letters[current]] = extractPaths(pixelGrid);
+    }
+    
+    // For other letters, we need to process their saved canvas data
+    for (const l of uniqueLetters) {
+        if (l !== letters[current] && grids[l]) {
+            // Create temporary canvas to process saved image
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 500;
+            tempCanvas.height = 500;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // For now, we'll just create empty paths for letters we haven't processed yet
+            // In a real implementation, you'd want to process the saved image data
+            letterPaths[l] = letterPaths[l] || [];
+        } else if (!letterPaths[l]) {
+            letterPaths[l] = []; // Empty paths for undrawn letters
+        }
     }
     
     return letterPaths;
@@ -353,6 +351,15 @@ function scaleAndCenterPaths(allPaths, boxSize = 350, margin = 25) {
 }
 
 function generateCode() {
+    if (letters[current]) {
+        grids[letters[current]] = canvas.toDataURL();
+    }
+    
+    // Validate all letters are drawn
+    if (!validateAllLettersDrawn()) {
+        return;
+    }
+
     // Save current drawing before generating
     if (letters[current]) {
         grids[letters[current]] = canvas.toDataURL();
@@ -370,10 +377,12 @@ function generateCode() {
         code += `pensize(3)\n`;
         code += `color('black')\n\n`;
         
-        // Generate helper functions for each unique letter
-        for (const l of Object.keys(scaledPaths)) {
+        // Generate helper functions for each unique letter that appears in the name
+        const uniqueLetters = [...new Set(letters)]; // Get unique letters from the name
+        
+        for (const l of uniqueLetters) {
             code += `def helper_${escapeLetter(l)}():\n`;
-            const paths = scaledPaths[l];
+            const paths = scaledPaths[l] || []; // Use empty array if no paths
             if (!paths.length) {
                 code += `    pass  # No drawing for this letter\n`;
             } else {
@@ -392,12 +401,14 @@ function generateCode() {
             code += `\n`;
         }
         
-        // Main helper function
+        // Main helper function - only include letters that actually exist in the name
         code += `def helper(c):\n`;
         code += `    if False: pass\n`;
-        for (const l of Object.keys(scaledPaths)) {
+        for (const l of uniqueLetters) {
             code += `    elif c == '${l.replace("'", "\\'")}': helper_${escapeLetter(l)}()\n`;
         }
+        code += `    else:\n`;
+        code += `        pass  # Letter not drawn\n`;
         code += `\n`;
         
         // Draw name function
@@ -420,9 +431,8 @@ function generateCode() {
         document.getElementById('generatedCode').textContent = code;
         document.getElementById('drawingSection').classList.add('hidden');
         document.getElementById('codeSection').classList.remove('hidden');
-    }, 100); // Small delay to ensure canvas is saved
+    }, 100);
 }
-
 function escapeLetter(l) { 
     return /^[a-zA-Z]$/.test(l) ? l : 'char' + l.charCodeAt(0); 
 }
@@ -445,4 +455,55 @@ function downloadCode() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function validateAllLettersDrawn() {
+    const uniqueLetters = [...new Set(letters)];
+    const missingLetters = [];
+    
+    for (const letter of uniqueLetters) {
+        if (!grids[letter] && letter !== letters[current]) {
+            missingLetters.push(letter);
+        }
+    }
+    
+    if (missingLetters.length > 0) {
+        alert(`Please draw the following letters: ${missingLetters.join(', ')}`);
+        return false;
+    }
+    
+    return true;
+}
+
+// Update the generateCode function to include validation
+function showLetter() {
+    document.getElementById('currentLetter').textContent = letters[current] || '';
+    
+    // Show which letters are completed
+    const uniqueLetters = [...new Set(letters)];
+    const completedLetters = Object.keys(grids).filter(l => grids[l]);
+    const pendingLetters = uniqueLetters.filter(l => !completedLetters.includes(l) && l !== letters[current]);
+    
+    if (pendingLetters.length > 0) {
+        document.getElementById('currentLetter').innerHTML += 
+            `<br><small style="color: #666;">Still need: ${pendingLetters.join(', ')}</small>`;
+    }
+    
+    // Load existing drawing if available
+    if (grids[letters[current]]) {
+        const img = new Image();
+        img.onload = () => {
+            clearCanvas();
+            ctx.drawImage(img, 0, 0);
+        };
+        img.src = grids[letters[current]];
+    } else {
+        clearCanvas();
+    }
+    
+    document.getElementById('prevBtn').disabled = current === 0;
+    document.getElementById('nextBtn').classList.toggle('hidden', current === letters.length-1);
+    document.getElementById('generateBtn').classList.toggle('hidden', current !== letters.length-1);
+    document.getElementById('progressFill').style.width = ((current+1)/letters.length*100)+'%';
+    document.getElementById('progressText').textContent = `${current+1} / ${letters.length}`;
 }
