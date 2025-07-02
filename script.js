@@ -334,33 +334,73 @@ function getFontGlyphPaths(text, font, fontSize = 200) {
     return { paths, minX, minY, maxX, maxY };
 }
 
-function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0) {
+function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, fillLetters = false) {
     const commands = [];
-    for (const path of paths) {
-        if (path.length > 0) {
-            const start = path[0];
-            const startX = Math.max(0, Math.round(start.x * scale + offsetX));
-            const startY = Math.max(0, Math.round(start.y * scale + offsetY));
-            
-            commands.push(`    penup()`);
-            commands.push(`    goto(${startX}, ${startY})`);
-            commands.push(`    pendown()`);
-            
-            for (let i = 1; i < path.length; i++) {
-                const pt = path[i];
-                const x = Math.max(0, Math.round(pt.x * scale + offsetX));
-                const y = Math.max(0, Math.round(pt.y * scale + offsetY));
-                commands.push(`    goto(${x}, ${y})`);
+    
+    if (fillLetters && paths.length > 0) {
+        // For filled letters, we need to group all paths and fill them together
+        commands.push(`    color('black')`);
+        commands.push(`    begin_fill()`);
+        
+        for (const path of paths) {
+            if (path.length > 0) {
+                const start = path[0];
+                const startX = Math.max(0, Math.round(start.x * scale + offsetX));
+                const startY = Math.max(0, Math.round(start.y * scale + offsetY));
+                
+                commands.push(`    penup()`);
+                commands.push(`    goto(${startX}, ${startY})`);
+                commands.push(`    pendown()`);
+                
+                for (let i = 1; i < path.length; i++) {
+                    const pt = path[i];
+                    const x = Math.max(0, Math.round(pt.x * scale + offsetX));
+                    const y = Math.max(0, Math.round(pt.y * scale + offsetY));
+                    commands.push(`    goto(${x}, ${y})`);
+                }
+                
+                // Close the path for proper filling
+                if (path.length > 2) {
+                    const firstPoint = path[0];
+                    const firstX = Math.max(0, Math.round(firstPoint.x * scale + offsetX));
+                    const firstY = Math.max(0, Math.round(firstPoint.y * scale + offsetY));
+                    commands.push(`    goto(${firstX}, ${firstY})`);
+                }
             }
-            commands.push(`    penup()`);
+        }
+        
+        commands.push(`    end_fill()`);
+        commands.push(`    penup()`);
+    } else {
+        // Original outline-only code
+        for (const path of paths) {
+            if (path.length > 0) {
+                const start = path[0];
+                const startX = Math.max(0, Math.round(start.x * scale + offsetX));
+                const startY = Math.max(0, Math.round(start.y * scale + offsetY));
+                
+                commands.push(`    penup()`);
+                commands.push(`    goto(${startX}, ${startY})`);
+                commands.push(`    pendown()`);
+                
+                for (let i = 1; i < path.length; i++) {
+                    const pt = path[i];
+                    const x = Math.max(0, Math.round(pt.x * scale + offsetX));
+                    const y = Math.max(0, Math.round(pt.y * scale + offsetY));
+                    commands.push(`    goto(${x}, ${y})`);
+                }
+                commands.push(`    penup()`);
+            }
         }
     }
+    
     return commands;
 }
 
 function generateCode() {
     const name = document.getElementById('nameInput').value.trim();
     const useCustomSize = document.getElementById('customSizeCheckbox').checked;
+    const fillLetters = document.getElementById('fillLettersCheckbox').checked;
     
     if (!loadedFont) {
         alert('Font is still loading. Please wait a moment and try again.');
@@ -428,15 +468,18 @@ function generateCode() {
     }
     
     code += `t.hideturtle()\n`;
-    code += `pensize(2)\n\n`;
+    if (!fillLetters) {
+        code += `pensize(2)\n`;
+    }
+    code += `\n`;
     
-    const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY);
+    const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY, fillLetters);
     code += `def draw_name():\n`;
     
     if (useCustomSize) {
-        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight})"""\n`;
+        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${fillLetters ? ', filled' : ', outline'})"""\n`;
     } else {
-        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)})"""\n`;
+        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${fillLetters ? ', filled' : ', outline'})"""\n`;
     }
     if (commands.length === 0) {
         code += `    pass  # No drawing data\n`;
