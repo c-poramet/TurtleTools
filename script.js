@@ -391,13 +391,13 @@ function generateCode() {
     // Scale to fit within available space
     const scale = Math.min(availableWidth / textWidth, availableHeight / textHeight, 1);
     
-    // Calculate scaled dimensions
+    // Calculate actual scaled text dimensions
     const scaledWidth = textWidth * scale;
     const scaledHeight = textHeight * scale;
     
-    // Center the text by calculating offsets
-    const offsetX = (canvasWidth - scaledWidth) / 2 - minX * scale;
-    const offsetY = (canvasHeight - scaledHeight) / 2 - minY * scale;
+    // Simple centering: place text so its bounding box is centered
+    const offsetX = (canvasWidth - scaledWidth) / 2 - (minX * scale);
+    const offsetY = (canvasHeight - scaledHeight) / 2 - (minY * scale);
     
     const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY);
     code += `def draw_name():\n`;
