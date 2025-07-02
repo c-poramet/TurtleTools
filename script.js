@@ -511,8 +511,9 @@ function generateCode() {
             fnCode += commands.join("\n") + "\n";
         }
         letterFns.push(fnCode);
-        // Save advance width for this glyph
-        glyphAdvances.push(glyph.advanceWidth * (200 / selectedFont.unitsPerEm) * scale);
+        // Only advance for glyphs with significant width (e.g., > 10)
+        const adv = glyph.advanceWidth * (200 / selectedFont.unitsPerEm) * scale;
+        glyphAdvances.push(adv > 10 ? adv : 0);
     }
     // Output all letter functions
     code += letterFns.join('\n') + '\n';
