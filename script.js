@@ -455,14 +455,15 @@ function generateCode() {
     }
     code += `\n`;
 
-    // Generate a function for each letter
+    // Generate a function for each letter, now with base_x argument
     let letterFns = [];
     let letterCalls = [];
     let xCursor = 0;
+    let glyphAdvances = [];
     for (let i = 0; i < name.length; i++) {
         const letter = name[i];
         const glyph = selectedFont.charToGlyph(letter);
-        const glyphPath = glyph.getPath(xCursor, 200, 200);
+        const glyphPath = glyph.getPath(0, 200, 200); // always at 0, we'll offset in main
         // Get only this letter's paths
         let currentPath = [];
         let paths = [];
@@ -477,38 +478,59 @@ function generateCode() {
             }
         }
         if (currentPath.length > 0) paths.push(currentPath);
-        // Calculate offset for this letter
-        let letterOffsetX = offsetX;
-        let letterOffsetY = offsetY;
         // Generate function name
         let fnName = /^[a-zA-Z]$/.test(letter) ? `draw_${letter.toLowerCase()}` : `draw_char_${letter.charCodeAt(0)}`;
-        letterCalls.push(`    ${fnName}()`);
-        // Generate commands for this letter
-        let commands = fontPathsToTurtleCommands(paths, scale, letterOffsetX, letterOffsetY, useThickStrokes);
-        let fnCode = `def ${fnName}():\n`;
-        fnCode += `    """Draw letter '${letter}'"""\n`;
+        letterCalls.push({ fnName, i });
+        // Generate commands for this letter, with base_x and base_y
+        let fnCode = `def ${fnName}(base_x, base_y):\n`;
+        fnCode += `    """Draw letter '${letter}' at (base_x, base_y)"""\n`;
+        let commands = [];
+        if (useThickStrokes) {
+            commands.push(`    width(15)  # Thick stroke with thin font for filled effect`);
+        }
+        for (const path of paths) {
+            if (path.length > 0) {
+                const start = path[0];
+                const startX = Math.max(0, Math.round(start.x * scale + offsetX));
+                const startY = Math.max(0, Math.round(start.y * scale + offsetY));
+                commands.push(`    penup()`);
+                commands.push(`    goto(base_x + ${startX}, base_y + ${startY})`);
+                commands.push(`    pendown()`);
+                for (let j = 1; j < path.length; j++) {
+                    const pt = path[j];
+                    const x = Math.max(0, Math.round(pt.x * scale + offsetX));
+                    const y = Math.max(0, Math.round(pt.y * scale + offsetY));
+                    commands.push(`    goto(base_x + ${x}, base_y + ${y})`);
+                }
+                commands.push(`    penup()`);
+            }
+        }
         if (commands.length === 0) {
             fnCode += `    pass  # No drawing data for this letter\n`;
         } else {
-            for (const command of commands) {
-                fnCode += `${command}\n`;
-            }
+            fnCode += commands.join("\n") + "\n";
         }
         letterFns.push(fnCode);
-        // Advance xCursor for next letter
-        xCursor += glyph.advanceWidth * (200 / selectedFont.unitsPerEm);
+        // Save advance width for this glyph
+        glyphAdvances.push(glyph.advanceWidth * (200 / selectedFont.unitsPerEm) * scale);
     }
     // Output all letter functions
     code += letterFns.join('\n') + '\n';
-    // Main function to call all letter functions in order
+    // Main function to call all letter functions in order, advancing base_x
     code += `def draw_name():\n`;
     if (useCustomSize) {
         code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
     } else {
         code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
     }
-    for (const call of letterCalls) {
-        code += call + '\n';
+    code += `    base_x = 0\n`;
+    code += `    base_y = 0\n`;
+    for (let i = 0; i < letterCalls.length; i++) {
+        const { fnName } = letterCalls[i];
+        code += `    ${fnName}(base_x, base_y)\n`;
+        if (i < glyphAdvances.length) {
+            code += `    base_x += ${Math.round(glyphAdvances[i])}\n`;
+        }
     }
     code += `\ndraw_name()\n`;
     document.getElementById('generatedCode').textContent = code;
