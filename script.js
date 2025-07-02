@@ -368,40 +368,37 @@ function generateCode() {
         alert('Please enter a name!');
         return;
     }
-    let code = `!pip install ColabTurtle\n`;
-    code += `from ColabTurtle.Turtle import *\n`;
-    code += `import ColabTurtle.Turtle as t\n`;
-    code += `t.initializeTurtle(initial_speed=13)\n`;
-    code += `t.hideturtle()\n`;
-    code += `pensize(2)\n\n`;
-    // Get paths and bounding box
+    
+    // Get paths and bounding box first
     const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, loadedFont, 200);
     
     // Calculate text dimensions
     const textWidth = maxX - minX;
     const textHeight = maxY - minY;
     
-    // ColabTurtle uses 400x400 canvas with (0,0) at top-left
-    const canvasWidth = 400;
-    const canvasHeight = 400;
+    // Add margin around the text
     const margin = 50;
-    const availableWidth = canvasWidth - (2 * margin);
-    const availableHeight = canvasHeight - (2 * margin);
+    const canvasWidth = Math.max(400, Math.ceil(textWidth + (2 * margin)));
+    const canvasHeight = Math.max(400, Math.ceil(textHeight + (2 * margin)));
     
-    // Scale to fit within available space
-    const scale = Math.min(availableWidth / textWidth, availableHeight / textHeight, 1);
+    let code = `!pip install ColabTurtle\n`;
+    code += `from ColabTurtle.Turtle import *\n`;
+    code += `import ColabTurtle.Turtle as t\n`;
+    code += `# Set up canvas size to fit the name perfectly\n`;
+    code += `t.initializeTurtle(initial_window_size=(${canvasWidth}, ${canvasHeight}), initial_speed=13)\n`;
+    code += `t.hideturtle()\n`;
+    code += `pensize(2)\n\n`;
     
-    // Calculate scaled dimensions
-    const scaledWidth = textWidth * scale;
-    const scaledHeight = textHeight * scale;
+    // No scaling needed since canvas fits the text
+    const scale = 1;
     
     // Center the text by calculating offsets
-    const offsetX = (canvasWidth - scaledWidth) / 2 - minX * scale;
-    const offsetY = (canvasHeight - scaledHeight) / 2 - minY * scale;
+    const offsetX = margin - minX;
+    const offsetY = margin - minY;
     
     const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY);
     code += `def draw_name():\n`;
-    code += `    """Draw the name: ${name} centered in the window"""\n`;
+    code += `    """Draw the name: ${name} (canvas: ${canvasWidth}x${canvasHeight})"""\n`;
     if (commands.length === 0) {
         code += `    pass  # No drawing data\n`;
     } else {
