@@ -216,3 +216,24 @@ button:active {
         width: 200px;
     }
 }
+
+#drawingCanvas {
+    border: 3px solid #333;
+    border-radius: 8px;
+    background: white;
+    cursor: crosshair;
+    display: block;
+    margin: 0 auto;
+}
+
+.canvas-container {
+    text-align: center;
+    margin: 20px 0;
+}
+
+@media (max-width: 600px) {
+    #drawingCanvas {
+        width: 300px;
+        height: 300px;
+    }
+}
