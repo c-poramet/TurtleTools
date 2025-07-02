@@ -275,16 +275,164 @@ const app = new HandwritingToTurtle();
 
 // --- Font to Turtle Graphics Only ---
 let loadedFont = null;
+let defaultKanitFont = null;
+
+// Load Kanit Regular as default font
+async function loadDefaultFont() {
+    try {
+        // Try to load Kanit Regular from Google Fonts
+        // Using a more reliable direct URL for Kanit Regular
+        const response = await fetch('https://fonts.gstatic.com/s/kanit/v15/nKKZ-Go6G5tXcoaSEQGodLxA.woff2');
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch font');
+        }
+        
+        const fontBuffer = await response.arrayBuffer();
+        
+        opentype.load(fontBuffer, function(err, font) {
+            if (!err && font) {
+                defaultKanitFont = font;
+                loadedFont = font;
+                document.getElementById('fontName').textContent = 'Kanit Regular (Default)';
+                console.log('Kanit Regular loaded successfully');
+            } else {
+                console.error('Failed to load Kanit font:', err);
+                loadFallbackFont();
+            }
+        });
+    } catch (error) {
+        console.error('Failed to fetch Kanit font:', error);
+        loadFallbackFont();
+    }
+}
+
+function loadFallbackFont() {
+    // Create a better fallback using system font metrics
+    loadedFont = createFallbackFont();
+    document.getElementById('fontName').textContent = 'System Font (Fallback)';
+    console.log('Using fallback font');
+}
+
+// Create a simple fallback font simulation
+function createFallbackFont() {
+    return {
+        charToGlyph: function(char) {
+            return {
+                getPath: function(x, y, fontSize) {
+                    return getSimpleCharPath(char, x, y, fontSize);
+                },
+                advanceWidth: 600 // Standard width
+            };
+        },
+        unitsPerEm: 1000,
+        names: { fullName: { en: 'Fallback Font' } }
+    };
+}
+
+// Simple character path generation for fallback
+function getSimpleCharPath(char, x, y, fontSize) {
+    const scale = fontSize / 1000;
+    const width = 400 * scale;
+    const height = 600 * scale;
+    
+    const commands = [];
+    
+    // Create simple letter shapes based on character
+    switch (char.toLowerCase()) {
+        case 'a':
+            // Triangle with crossbar
+            commands.push({type: 'M', x: x + 200*scale, y: y - 600*scale}); // Top
+            commands.push({type: 'L', x: x + 50*scale, y: y}); // Bottom left
+            commands.push({type: 'L', x: x + 350*scale, y: y}); // Bottom right
+            commands.push({type: 'Z'});
+            // Crossbar
+            commands.push({type: 'M', x: x + 125*scale, y: y - 200*scale});
+            commands.push({type: 'L', x: x + 275*scale, y: y - 200*scale});
+            break;
+        case 'b':
+            // Vertical line with two bumps
+            commands.push({type: 'M', x: x + 50*scale, y: y});
+            commands.push({type: 'L', x: x + 50*scale, y: y - 600*scale});
+            commands.push({type: 'L', x: x + 250*scale, y: y - 600*scale});
+            commands.push({type: 'L', x: x + 300*scale, y: y - 450*scale});
+            commands.push({type: 'L', x: x + 250*scale, y: y - 300*scale});
+            commands.push({type: 'L', x: x + 300*scale, y: y - 150*scale});
+            commands.push({type: 'L', x: x + 250*scale, y: y});
+            commands.push({type: 'L', x: x + 50*scale, y: y});
+            commands.push({type: 'Z'});
+            break;
+        case 'c':
+            // Open circle
+            commands.push({type: 'M', x: x + 350*scale, y: y - 150*scale});
+            commands.push({type: 'L', x: x + 200*scale, y: y});
+            commands.push({type: 'L', x: x + 100*scale, y: y - 150*scale});
+            commands.push({type: 'L', x: x + 100*scale, y: y - 450*scale});
+            commands.push({type: 'L', x: x + 200*scale, y: y - 600*scale});
+            commands.push({type: 'L', x: x + 350*scale, y: y - 450*scale});
+            break;
+        case 'd':
+            // Vertical line with curve
+            commands.push({type: 'M', x: x + 50*scale, y: y});
+            commands.push({type: 'L', x: x + 200*scale, y: y});
+            commands.push({type: 'L', x: x + 300*scale, y: y - 150*scale});
+            commands.push({type: 'L', x: x + 300*scale, y: y - 450*scale});
+            commands.push({type: 'L', x: x + 200*scale, y: y - 600*scale});
+            commands.push({type: 'L', x: x + 50*scale, y: y - 600*scale});
+            commands.push({type: 'Z'});
+            break;
+        case 'e':
+            // E shape
+            commands.push({type: 'M', x: x + 50*scale, y: y});
+            commands.push({type: 'L', x: x + 300*scale, y: y});
+            commands.push({type: 'L', x: x + 300*scale, y: y - 100*scale});
+            commands.push({type: 'L', x: x + 150*scale, y: y - 100*scale});
+            commands.push({type: 'L', x: x + 150*scale, y: y - 250*scale});
+            commands.push({type: 'L', x: x + 250*scale, y: y - 250*scale});
+            commands.push({type: 'L', x: x + 250*scale, y: y - 350*scale});
+            commands.push({type: 'L', x: x + 150*scale, y: y - 350*scale});
+            commands.push({type: 'L', x: x + 150*scale, y: y - 500*scale});
+            commands.push({type: 'L', x: x + 300*scale, y: y - 500*scale});
+            commands.push({type: 'L', x: x + 300*scale, y: y - 600*scale});
+            commands.push({type: 'L', x: x + 50*scale, y: y - 600*scale});
+            commands.push({type: 'Z'});
+            break;
+        case ' ':
+            // Space - no drawing
+            break;
+        default:
+            // Simple rectangle for unknown characters
+            commands.push({type: 'M', x: x + 50*scale, y: y});
+            commands.push({type: 'L', x: x + 350*scale, y: y});
+            commands.push({type: 'L', x: x + 350*scale, y: y - 500*scale});
+            commands.push({type: 'L', x: x + 50*scale, y: y - 500*scale});
+            commands.push({type: 'Z'});
+    }
+    
+    return { commands };
+}
+
+// Load default font on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadDefaultFont();
+});
+
 document.getElementById('fontUpload').addEventListener('change', function(e) {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) {
+        // Reset to default font if no file selected
+        loadedFont = defaultKanitFont || loadedFont;
+        document.getElementById('fontName').textContent = defaultKanitFont ? 'Kanit Regular (Default)' : 'System Font (Fallback)';
+        return;
+    }
     const reader = new FileReader();
     reader.onload = function(event) {
         opentype.load(event.target.result, function(err, font) {
             if (err) {
                 alert('Font could not be loaded: ' + err);
-                loadedFont = null;
-                document.getElementById('fontName').textContent = '';
+                // Revert to default font
+                loadedFont = defaultKanitFont || loadedFont;
+                document.getElementById('fontName').textContent = defaultKanitFont ? 'Kanit Regular (Default)' : 'System Font (Fallback)';
             } else {
                 loadedFont = font;
                 document.getElementById('fontName').textContent = font.names.fullName.en || file.name;
@@ -343,7 +491,7 @@ function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, m
 function generateCode() {
     const name = document.getElementById('nameInput').value.trim();
     if (!loadedFont) {
-        alert('Please upload a font file first!');
+        alert('Font is still loading, please wait a moment and try again!');
         return;
     }
     if (!name) {
