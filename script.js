@@ -275,8 +275,9 @@ const app = new HandwritingToTurtle();
 
 // --- Font to Turtle Graphics Only ---
 let loadedFont = null;
+let loadedThinFont = null;
 
-// Load Kanit-Regular.ttf automatically on page load
+// Load both Kanit-Regular.ttf and Kanit-Thin.ttf automatically on page load
 window.addEventListener('load', function() {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const nameInput = document.getElementById('nameInput');
@@ -286,23 +287,50 @@ window.addEventListener('load', function() {
     nameInput.disabled = true;
     generateBtn.disabled = true;
     
+    let fontsLoaded = 0;
+    const totalFonts = 2;
+    
+    function checkAllFontsLoaded() {
+        fontsLoaded++;
+        if (fontsLoaded === totalFonts) {
+            // Hide loading indicator
+            loadingIndicator.classList.add('hidden');
+            
+            if (loadedFont && loadedThinFont) {
+                console.log('Both Kanit fonts loaded successfully');
+                
+                // Enable input after successful loading
+                nameInput.disabled = false;
+                generateBtn.disabled = false;
+                nameInput.focus();
+            } else {
+                alert('Could not load all required fonts. Please make sure both Kanit-Regular.ttf and Kanit-Thin.ttf are in the same directory.');
+            }
+        }
+    }
+    
+    // Load Kanit-Regular.ttf
     opentype.load('./Kanit-Regular.ttf', function(err, font) {
-        // Hide loading indicator
-        loadingIndicator.classList.add('hidden');
-        
         if (err) {
-            console.error('Font could not be loaded:', err);
-            alert('Could not load Kanit-Regular.ttf font. Please make sure the font file is in the same directory.');
+            console.error('Kanit-Regular font could not be loaded:', err);
             loadedFont = null;
         } else {
             loadedFont = font;
             console.log('Kanit-Regular font loaded successfully');
-            
-            // Enable input after successful loading
-            nameInput.disabled = false;
-            generateBtn.disabled = false;
-            nameInput.focus();
         }
+        checkAllFontsLoaded();
+    });
+    
+    // Load Kanit-Thin.ttf
+    opentype.load('./Kanit-Thin.ttf', function(err, font) {
+        if (err) {
+            console.error('Kanit-Thin font could not be loaded:', err);
+            loadedThinFont = null;
+        } else {
+            loadedThinFont = font;
+            console.log('Kanit-Thin font loaded successfully');
+        }
+        checkAllFontsLoaded();
     });
 });
 
@@ -334,75 +362,34 @@ function getFontGlyphPaths(text, font, fontSize = 200) {
     return { paths, minX, minY, maxX, maxY };
 }
 
-function simplifyPathToCenterLine(path, simplificationFactor = 0.3) {
-    if (path.length <= 2) return path;
-    
-    // Take fewer points to create a center-line effect
-    const simplified = [];
-    const step = Math.max(1, Math.floor(path.length * simplificationFactor));
-    
-    for (let i = 0; i < path.length; i += step) {
-        simplified.push(path[i]);
-    }
-    
-    // Always include the last point
-    if (simplified[simplified.length - 1] !== path[path.length - 1]) {
-        simplified.push(path[path.length - 1]);
-    }
-    
-    return simplified;
-}
 
 function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, useThickStrokes = false) {
     const commands = [];
     
     if (useThickStrokes) {
-        // Use thick pen width to simulate filled letters
-        commands.push(`    width(20)  # Thick stroke for filled effect`);
+        // Use thick pen width with thin font paths for filled effect
+        commands.push(`    width(15)  # Thick stroke with thin font for filled effect`);
         commands.push(`    color('black')`);
-        
-        for (const path of paths) {
-            if (path.length > 0) {
-                // Simplify path to create center-line effect
-                const centerPath = simplifyPathToCenterLine(path, 0.4);
-                
-                const start = centerPath[0];
-                const startX = Math.max(0, Math.round(start.x * scale + offsetX));
-                const startY = Math.max(0, Math.round(start.y * scale + offsetY));
-                
-                commands.push(`    penup()`);
-                commands.push(`    goto(${startX}, ${startY})`);
-                commands.push(`    pendown()`);
-                
-                for (let i = 1; i < centerPath.length; i++) {
-                    const pt = centerPath[i];
-                    const x = Math.max(0, Math.round(pt.x * scale + offsetX));
-                    const y = Math.max(0, Math.round(pt.y * scale + offsetY));
-                    commands.push(`    goto(${x}, ${y})`);
-                }
-                commands.push(`    penup()`);
+    }
+    
+    // Draw the paths normally (whether from regular or thin font)
+    for (const path of paths) {
+        if (path.length > 0) {
+            const start = path[0];
+            const startX = Math.max(0, Math.round(start.x * scale + offsetX));
+            const startY = Math.max(0, Math.round(start.y * scale + offsetY));
+            
+            commands.push(`    penup()`);
+            commands.push(`    goto(${startX}, ${startY})`);
+            commands.push(`    pendown()`);
+            
+            for (let i = 1; i < path.length; i++) {
+                const pt = path[i];
+                const x = Math.max(0, Math.round(pt.x * scale + offsetX));
+                const y = Math.max(0, Math.round(pt.y * scale + offsetY));
+                commands.push(`    goto(${x}, ${y})`);
             }
-        }
-    } else {
-        // Original outline-only code
-        for (const path of paths) {
-            if (path.length > 0) {
-                const start = path[0];
-                const startX = Math.max(0, Math.round(start.x * scale + offsetX));
-                const startY = Math.max(0, Math.round(start.y * scale + offsetY));
-                
-                commands.push(`    penup()`);
-                commands.push(`    goto(${startX}, ${startY})`);
-                commands.push(`    pendown()`);
-                
-                for (let i = 1; i < path.length; i++) {
-                    const pt = path[i];
-                    const x = Math.max(0, Math.round(pt.x * scale + offsetX));
-                    const y = Math.max(0, Math.round(pt.y * scale + offsetY));
-                    commands.push(`    goto(${x}, ${y})`);
-                }
-                commands.push(`    penup()`);
-            }
+            commands.push(`    penup()`);
         }
     }
     
@@ -414,8 +401,8 @@ function generateCode() {
     const useCustomSize = document.getElementById('customSizeCheckbox').checked;
     const useThickStrokes = document.getElementById('fillLettersCheckbox').checked;
     
-    if (!loadedFont) {
-        alert('Font is still loading. Please wait a moment and try again.');
+    if (!loadedFont || (useThickStrokes && !loadedThinFont)) {
+        alert('Fonts are still loading. Please wait a moment and try again.');
         return;
     }
     if (!name) {
@@ -423,8 +410,11 @@ function generateCode() {
         return;
     }
     
+    // Choose the appropriate font based on the thick strokes option
+    const selectedFont = useThickStrokes ? loadedThinFont : loadedFont;
+    
     // Get paths and bounding box first
-    const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, loadedFont, 200);
+    const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, selectedFont, 200);
     
     let code = `!pip install ColabTurtle\n`;
     code += `from ColabTurtle.Turtle import *\n`;
@@ -489,9 +479,9 @@ function generateCode() {
     code += `def draw_name():\n`;
     
     if (useCustomSize) {
-        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${useThickStrokes ? ', thick strokes' : ', outline'})"""\n`;
+        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
     } else {
-        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${useThickStrokes ? ', thick strokes' : ', outline'})"""\n`;
+        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
     }
     if (commands.length === 0) {
         code += `    pass  # No drawing data\n`;
