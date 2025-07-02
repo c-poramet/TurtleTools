@@ -51,6 +51,12 @@ h1 {
     border-color: #667eea;
 }
 
+#nameInput:disabled {
+    background: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+}
+
 button {
     background: linear-gradient(45deg, #667eea, #764ba2);
     color: white;
@@ -68,6 +74,16 @@ button:hover {
 
 button:active {
     transform: translateY(0);
+}
+
+button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+button:disabled:hover {
+    transform: none;
 }
 
 /* Drawing Section */
@@ -135,7 +151,7 @@ button:active {
 
 /* Code Section */
 .code-container {
-    background: #2d3748;
+    background: #2d3747;
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -151,37 +167,48 @@ button:active {
     white-space: pre-wrap;
 }
 
-/* Font Upload Section */
-#fontSection {
+/* Loading Indicator */
+.loading-indicator {
+    text-align: center;
+    padding: 10px;
+    background: #f0f8ff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    color: #666;
+    font-style: italic;
+}
+
+.loading-indicator.hidden {
+    display: none;
+}
+
+/* Canvas option styling */
+.canvas-option {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.canvas-option label {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 30px;
-    margin-top: 2rem;
-}
-
-#fontUpload {
-    
-    padding: 8px 16px;
-    border: 1px solid #aaa;
-    border-radius: 5px;
-    background: #f8f8f8;
-    font-size: 1em;
     cursor: pointer;
-    transition: border 0.2s, box-shadow 0.2s;
+    font-weight: 500;
+    margin-bottom: 5px;
 }
 
-#fontUpload:hover, #fontUpload:focus {
-    border: 1.5px solid #0078d7;
-    box-shadow: 0 0 4px #0078d7;
-    background: #f0f8ff;
+.canvas-option input[type="checkbox"] {
+    margin-right: 10px;
+    transform: scale(1.2);
 }
 
-#fontName {
-    font-size: 1em;
-    color: #333;
-    font-style: italic;
+.canvas-option small {
+    color: #6c757d;
+    font-size: 14px;
+    margin-left: 30px;
 }
 
 /* Responsive Design */

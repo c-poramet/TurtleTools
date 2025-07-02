@@ -12,17 +12,28 @@
     <div class="container">
         <h1>Font to Turtle Graphics Generator</h1>
         
-        <!-- Font Upload Section -->
-        <div id="fontSection" style="margin-bottom: 20px;">
-            <label for="fontUpload">Upload .ttf Font: </label>
-            <input type="file" id="fontUpload" accept=".ttf,.otf" />
-            <span id="fontName" style="margin-left: 10px;"></span>
-        </div>
-
         <!-- Name Input Section -->
         <div id="nameSection" class="section">
             <h2>Enter Your Name</h2>
+            <p style="margin-bottom: .5rem;">Using Kanit-Regular font for beautiful Thai and English text</p>
+            <div id="loadingIndicator" class="loading-indicator">
+                <span>Loading font...</span>
+            </div>
             <input type="text" id="nameInput" placeholder="Enter your name (English or Thai)">
+            <div class="canvas-option">
+                <label>
+                    <input type="checkbox" id="customSizeCheckbox" checked>
+                    Use custom canvas size (fits text perfectly)
+                </label>
+                <small>Uncheck to use default ColabTurtle canvas size</small>
+            </div>
+            <div class="canvas-option">
+                <label>
+                    <input type="checkbox" id="fillLettersCheckbox" checked>
+                    Use thick strokes (simulates filled letters)
+                </label>
+                <small>Creates thick pen strokes to simulate filled letters</small>
+            </div>
             <button onclick="generateCode()">Generate Code</button>
         </div>
 

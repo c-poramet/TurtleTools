@@ -215,7 +215,7 @@ class HandwritingToTurtle {
         let code = `!pip install ColabTurtle\n`;
         code += `from ColabTurtle.Turtle import *\n`;
         code += `import ColabTurtle.Turtle as t\n`;
-        code += `t.initializeTurtle(initial_speed=5)\n`;
+        code += `t.initializeTurtle(initial_speed=13)\n`;
         code += `t.hideturtle()\n`;
         code += `pensize(2)\n\n`;
         for (const letter of this.letters) {
@@ -275,23 +275,63 @@ const app = new HandwritingToTurtle();
 
 // --- Font to Turtle Graphics Only ---
 let loadedFont = null;
-document.getElementById('fontUpload').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        opentype.load(event.target.result, function(err, font) {
-            if (err) {
-                alert('Font could not be loaded: ' + err);
-                loadedFont = null;
-                document.getElementById('fontName').textContent = '';
+let loadedThinFont = null;
+
+// Load both Kanit-Regular.ttf and Kanit-Thin.ttf automatically on page load
+window.addEventListener('load', function() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const nameInput = document.getElementById('nameInput');
+    const generateBtn = document.querySelector('button[onclick="generateCode()"]');
+    
+    // Disable input while loading
+    nameInput.disabled = true;
+    generateBtn.disabled = true;
+    
+    let fontsLoaded = 0;
+    const totalFonts = 2;
+    
+    function checkAllFontsLoaded() {
+        fontsLoaded++;
+        if (fontsLoaded === totalFonts) {
+            // Hide loading indicator
+            loadingIndicator.classList.add('hidden');
+            
+            if (loadedFont && loadedThinFont) {
+                console.log('Both Kanit fonts loaded successfully');
+                
+                // Enable input after successful loading
+                nameInput.disabled = false;
+                generateBtn.disabled = false;
+                nameInput.focus();
             } else {
-                loadedFont = font;
-                document.getElementById('fontName').textContent = font.names.fullName.en || file.name;
+                alert('Could not load all required fonts. Please make sure both Kanit-Regular.ttf and Kanit-Thin.ttf are in the same directory.');
             }
-        });
-    };
-    reader.readAsDataURL(file);
+        }
+    }
+    
+    // Load Kanit-Regular.ttf
+    opentype.load('./Kanit-Regular.ttf', function(err, font) {
+        if (err) {
+            console.error('Kanit-Regular font could not be loaded:', err);
+            loadedFont = null;
+        } else {
+            loadedFont = font;
+            console.log('Kanit-Regular font loaded successfully');
+        }
+        checkAllFontsLoaded();
+    });
+    
+    // Load Kanit-Thin.ttf
+    opentype.load('./Kanit-Thin.ttf', function(err, font) {
+        if (err) {
+            console.error('Kanit-Thin font could not be loaded:', err);
+            loadedThinFont = null;
+        } else {
+            loadedThinFont = font;
+            console.log('Kanit-Thin font loaded successfully');
+        }
+        checkAllFontsLoaded();
+    });
 });
 
 function getFontGlyphPaths(text, font, fontSize = 200) {
@@ -322,65 +362,126 @@ function getFontGlyphPaths(text, font, fontSize = 200) {
     return { paths, minX, minY, maxX, maxY };
 }
 
-function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, minXShift = 0, minYShift = 0) {
+
+function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, useThickStrokes = false) {
     const commands = [];
+    
+    if (useThickStrokes) {
+        // Use thick pen width with thin font paths for filled effect
+        commands.push(`    width(15)  # Thick stroke with thin font for filled effect`);
+    }
+    
+    // Draw the paths normally (whether from regular or thin font)
     for (const path of paths) {
         if (path.length > 0) {
             const start = path[0];
+            const startX = Math.max(0, Math.round(start.x * scale + offsetX));
+            const startY = Math.max(0, Math.round(start.y * scale + offsetY));
+            
             commands.push(`    penup()`);
-            commands.push(`    goto(${Math.round(start.x * scale + offsetX + minXShift)}, ${Math.round(start.y * scale + offsetY + minYShift)})`);
+            commands.push(`    goto(${startX}, ${startY})`);
             commands.push(`    pendown()`);
+            
             for (let i = 1; i < path.length; i++) {
                 const pt = path[i];
-                commands.push(`    goto(${Math.round(pt.x * scale + offsetX + minXShift)}, ${Math.round(pt.y * scale + offsetY + minYShift)})`);
+                const x = Math.max(0, Math.round(pt.x * scale + offsetX));
+                const y = Math.max(0, Math.round(pt.y * scale + offsetY));
+                commands.push(`    goto(${x}, ${y})`);
             }
             commands.push(`    penup()`);
         }
     }
+    
     return commands;
 }
 
 function generateCode() {
     const name = document.getElementById('nameInput').value.trim();
-    if (!loadedFont) {
-        alert('Please upload a font file first!');
+    const useCustomSize = document.getElementById('customSizeCheckbox').checked;
+    const useThickStrokes = document.getElementById('fillLettersCheckbox').checked;
+    
+    if (!loadedFont || (useThickStrokes && !loadedThinFont)) {
+        alert('Fonts are still loading. Please wait a moment and try again.');
         return;
     }
     if (!name) {
         alert('Please enter a name!');
         return;
     }
+    
+    // Choose the appropriate font based on the thick strokes option
+    const selectedFont = useThickStrokes ? loadedThinFont : loadedFont;
+    
+    // Get paths and bounding box first
+    const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, selectedFont, 200);
+    
     let code = `!pip install ColabTurtle\n`;
     code += `from ColabTurtle.Turtle import *\n`;
     code += `import ColabTurtle.Turtle as t\n`;
-    code += `t.initializeTurtle(initial_speed=5)\n`;
-    code += `t.hideturtle()\n`;
-    code += `pensize(2)\n\n`;
-    // Get paths and bounding box
-    const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, loadedFont, 200);
-    // Centering offset
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    // Optionally scale to fit a 400x400 box (ColabTurtle default)
-    const width = maxX - minX;
-    const height = maxY - minY;
-    const scale = Math.min(350 / width, 350 / height, 1); // leave margin
-    // After centering, shift so minX/minY are 0 (or margin)
-    let shiftedMinX = Infinity, shiftedMinY = Infinity;
-    for (const path of paths) {
-        for (const pt of path) {
-            const sx = (pt.x - centerX) * scale;
-            const sy = (pt.y - centerY) * scale;
-            if (sx < shiftedMinX) shiftedMinX = sx;
-            if (sy < shiftedMinY) shiftedMinY = sy;
-        }
+    
+    let canvasWidth, canvasHeight, scale, offsetX, offsetY;
+    
+    if (useCustomSize) {
+        // Calculate text dimensions
+        const textWidth = maxX - minX;
+        const textHeight = maxY - minY;
+        
+        // Add margin around the text
+        const margin = 50;
+        canvasWidth = Math.max(400, Math.ceil(textWidth + (2 * margin)));
+        // Reduce height by using a smaller proportion of the text height for better visual balance
+        canvasHeight = Math.max(300, Math.ceil(textHeight * 0.6 + (2 * margin)));
+        
+        code += `# Set up custom canvas size to fit the name perfectly\n`;
+        code += `t.initializeTurtle(initial_window_size=(${canvasWidth}, ${canvasHeight}), initial_speed=13)\n`;
+        
+        // No scaling needed since canvas fits the text
+        scale = 1;
+        
+        // Center the text by calculating offsets
+        offsetX = margin - minX;
+        offsetY = margin - minY;
+    } else {
+        // Use default ColabTurtle canvas size (400x400)
+        canvasWidth = 400;
+        canvasHeight = 400;
+        const margin = 50;
+        const availableWidth = canvasWidth - (2 * margin);
+        const availableHeight = canvasHeight - (2 * margin);
+        
+        code += `# Using default ColabTurtle canvas size\n`;
+        code += `t.initializeTurtle(initial_speed=13)\n`;
+        
+        // Calculate text dimensions
+        const textWidth = maxX - minX;
+        const textHeight = maxY - minY;
+        
+        // Scale to fit within available space
+        scale = Math.min(availableWidth / textWidth, availableHeight / textHeight, 1);
+        
+        // Calculate scaled dimensions
+        const scaledWidth = textWidth * scale;
+        const scaledHeight = textHeight * scale;
+        
+        // Center the text by calculating offsets
+        offsetX = (canvasWidth - scaledWidth) / 2 - minX * scale;
+        offsetY = (canvasHeight - scaledHeight) / 2 - minY * scale;
     }
-    const margin = 25;
-    const minXShift = -shiftedMinX + margin;
-    const minYShift = -shiftedMinY + margin;
-    const commands = fontPathsToTurtleCommands(paths, scale, -centerX * scale, -centerY * scale, minXShift, minYShift);
+    
+    code += `t.hideturtle()\n`;
+    if (!useThickStrokes) {
+        code += `pensize(2)\n`;
+    }
+    code += `\n`;
+    
+    const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY, useThickStrokes);
     code += `def draw_name():\n`;
-    code += `    """Draw the name: ${name} centered in the window"""\n`;
+    
+    if (useCustomSize) {
+        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
+    } else {
+        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)}${useThickStrokes ? ', Kanit-Thin + thick pen' : ', Kanit-Regular outline'})"""\n`;
+    }
     if (commands.length === 0) {
         code += `    pass  # No drawing data\n`;
     } else {
