@@ -379,7 +379,8 @@ function generateCode() {
     // Add margin around the text
     const margin = 50;
     const canvasWidth = Math.max(400, Math.ceil(textWidth + (2 * margin)));
-    const canvasHeight = Math.max(400, Math.ceil(textHeight + (2 * margin)));
+    // Reduce height by using a smaller proportion of the text height for better visual balance
+    const canvasHeight = Math.max(300, Math.ceil(textHeight * 0.6 + (2 * margin)));
     
     let code = `!pip install ColabTurtle\n`;
     code += `from ColabTurtle.Turtle import *\n`;
