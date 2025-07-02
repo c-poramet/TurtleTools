@@ -1,423 +1,180 @@
-class HandwritingToTurtle {
-    constructor() {
-        this.canvas = null;
-        this.ctx = null;
-        this.isDrawing = false;
-        this.currentLetterIndex = 0;
-        this.letters = [];
-        this.letterData = {};
-        this.gridSize = 50;
-        this.cellSize = 10;
-        this.name = '';
-        this.brushSize = 8;
-        this.currentPath = [];
-    }
+// --- Hand-Drawn Pixel Grid to Turtle (Remake) ---
+const GRID_SIZE = 40;
+let name = '';
+let letters = [];
+let grids = {};
+let current = 0;
 
-    init() {
-        this.canvas = document.getElementById('drawingCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.setupCanvas();
-    }
-
-    setupCanvas() {
-        // Mouse events
-        this.canvas.onmousedown = (e) => this.startDrawing(e);
-        this.canvas.onmousemove = (e) => this.draw(e);
-        this.canvas.onmouseup = () => this.stopDrawing();
-        this.canvas.onmouseout = () => this.stopDrawing();
-
-        // Touch events for mobile
-        this.canvas.ontouchstart = (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousedown', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            this.canvas.dispatchEvent(mouseEvent);
-        };
-
-        this.canvas.ontouchmove = (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            this.canvas.dispatchEvent(mouseEvent);
-        };
-
-        this.canvas.ontouchend = (e) => {
-            e.preventDefault();
-            const mouseEvent = new MouseEvent('mouseup', {});
-            this.canvas.dispatchEvent(mouseEvent);
-        };
-    }
-
-    startDrawing(e) {
-        this.isDrawing = true;
-        this.currentPath = [];
-        
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        this.currentPath.push({x, y});
-        this.ctx.beginPath();
-        this.ctx.moveTo(x, y);
-    }
-
-    draw(e) {
-        if (!this.isDrawing) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        this.currentPath.push({x, y});
-        this.ctx.lineWidth = this.brushSize;
-        this.ctx.lineCap = 'round';
-        this.ctx.lineJoin = 'round';
-        this.ctx.strokeStyle = '#000';
-
-        this.ctx.lineTo(x, y);
-        this.ctx.stroke();
-    }
-
-    stopDrawing() {
-        if (this.isDrawing) {
-            this.isDrawing = false;
-            this.ctx.beginPath();
-        }
-    }
-
-    clearCanvas() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-
-    getDrawingPaths() {
-        // Convert canvas drawing to paths
-        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        const paths = [];
-        
-        // Find all drawn pixels
-        const drawnPixels = [];
-        for (let y = 0; y < this.canvas.height; y += 2) {
-            for (let x = 0; x < this.canvas.width; x += 2) {
-                const index = (y * this.canvas.width + x) * 4;
-                const alpha = imageData.data[index + 3];
-                
-                if (alpha > 0) {
-                    drawnPixels.push({x, y});
-                }
-            }
-        }
-        
-        // Group nearby pixels into paths
-        while (drawnPixels.length > 0) {
-            const path = [];
-            const startPixel = drawnPixels.shift();
-            const queue = [startPixel];
-            
-            while (queue.length > 0) {
-                const current = queue.shift();
-                path.push(current);
-                
-                for (let i = drawnPixels.length - 1; i >= 0; i--) {
-                    const pixel = drawnPixels[i];
-                    const distance = Math.sqrt(
-                        Math.pow(current.x - pixel.x, 2) + 
-                        Math.pow(current.y - pixel.y, 2)
-                    );
-                    
-                    if (distance < 15) {
-                        queue.push(pixel);
-                        drawnPixels.splice(i, 1);
-                    }
-                }
-            }
-            
-            if (path.length > 1) {
-                const sortedPath = this.sortPathPoints(path);
-                paths.push(sortedPath);
-            }
-        }
-        return paths;
-    }
-
-    sortPathPoints(points) {
-        if (points.length <= 2) return points;
-        
-        const sorted = [points[0]];
-        const remaining = points.slice(1);
-        
-        while (remaining.length > 0) {
-            const current = sorted[sorted.length - 1];
-            let nearest = remaining[0];
-            let nearestIndex = 0;
-            let nearestDistance = this.distance(current, nearest);
-            
-            for (let i = 1; i < remaining.length; i++) {
-                const distance = this.distance(current, remaining[i]);
-                if (distance < nearestDistance) {
-                    nearest = remaining[i];
-                    nearestIndex = i;
-                    nearestDistance = distance;
-                }
-            }
-            
-            sorted.push(nearest);
-            remaining.splice(nearestIndex, 1);
-        }
-        return sorted;
-    }
-
-    distance(p1, p2) {
-        return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
-    }
-
-    updateProgress() {
-        const progress = ((this.currentLetterIndex) / this.letters.length) * 100;
-        document.getElementById('progressFill').style.width = progress + '%';
-        document.getElementById('progressText').textContent = 
-            `${this.currentLetterIndex} / ${this.letters.length}`;
-    }
-
-    generateTurtleCommands(paths) {
-        const commands = [];
-        for (const path of paths) {
-            if (path.length > 0) {
-                // Convert canvas coordinates to ColabTurtle coordinates (non-negative, y-down)
-                const startPoint = this.canvasToColabTurtle(path[0]);
-                commands.push(`    penup()`);
-                commands.push(`    goto(${startPoint.x}, ${startPoint.y})`);
-                commands.push(`    pendown()`);
-                for (let i = 1; i < path.length; i++) {
-                    const point = this.canvasToColabTurtle(path[i]);
-                    commands.push(`    goto(${point.x}, ${point.y})`);
-                }
-            }
-        }
-        if (commands.length > 0) {
-            commands.push(`    penup()`);
-        }
-        return commands;
-    }
-
-    canvasToColabTurtle(canvasPoint) {
-        // Map canvas (0-500) to ColabTurtle (0-400), y-down
-        const x = Math.round((canvasPoint.x / this.canvas.width) * 400);
-        const y = Math.round((canvasPoint.y / this.canvas.height) * 400);
-        return {x, y};
-    }
-
-    generatePythonCode() {
-        let code = `!pip install ColabTurtle\n`;
-        code += `from ColabTurtle.Turtle import *\n`;
-        code += `import ColabTurtle.Turtle as t\n`;
-        code += `t.initializeTurtle(initial_speed=5)\n`;
-        code += `t.hideturtle()\n`;
-        code += `pensize(2)\n\n`;
-        for (const letter of this.letters) {
-            const paths = this.letterData[letter];
-            const commands = this.generateTurtleCommands(paths);
-            code += `def helper_${this.escapeLetterName(letter)}():\n`;
-            code += `    """Draw letter '${letter}'"""\n`;
-            if (commands.length === 0) {
-                code += `    pass  # No drawing data for this letter\n`;
-            } else {
-                for (const command of commands) {
-                    code += `${command}\n`;
-                }
-            }
-            code += `\n`;
-        }
-        code += `def draw_name():\n`;
-        code += `    """Draw the complete name: ${this.name}"""\n`;
-        code += `    penup()\n`;
-        code += `    # Calculate starting position\n`;
-        code += `    letter_width = 250\n`;
-        code += `    start_x = 50\n`;
-        code += `    start_y = 200\n`;
-        code += `    \n`;
-        for (let i = 0; i < this.letters.length; i++) {
-            const letter = this.letters[i];
-            code += `    # Position for letter '${letter}'\n`;
-            code += `    base_x = start_x + ${i} * letter_width\n`;
-            code += `    base_y = start_y\n`;
-            code += `    \n`;
-            code += `    # Save current position\n`;
-            code += `    current_pos = position()\n`;
-            code += `    \n`;
-            code += `    # Move to letter position and draw\n`;
-            code += `    penup()\n`;
-            code += `    goto(base_x, base_y)\n`;
-            code += `    helper_${this.escapeLetterName(letter)}()\n`;
-            code += `    \n`;
-        }
-        code += `\n# Execute the drawing\n`;
-        code += `draw_name()\n`;
-        return code;
-    }
-
-    escapeLetterName(letter) {
-        const charCode = letter.charCodeAt(0);
-        if ((charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122)) {
-            return letter.toLowerCase();
-        } else {
-            return `char_${charCode}`;
-        }
-    }
+function startDrawing() {
+    name = document.getElementById('nameInput').value.trim();
+    if (!name) return alert('Enter a name!');
+    letters = [...name];
+    grids = {};
+    letters.forEach(l => { if (!grids[l]) grids[l] = Array(GRID_SIZE).fill().map(()=>Array(GRID_SIZE).fill(0)); });
+    current = 0;
+    document.getElementById('nameSection').classList.add('hidden');
+    document.getElementById('drawingSection').classList.remove('hidden');
+    document.getElementById('codeSection').classList.add('hidden');
+    showLetter();
 }
 
-// Global instance
-const app = new HandwritingToTurtle();
+function showLetter() {
+    document.getElementById('currentLetter').textContent = letters[current] || '';
+    drawGrid(grids[letters[current]]);
+    document.getElementById('prevBtn').disabled = current === 0;
+    document.getElementById('nextBtn').classList.toggle('hidden', current === letters.length-1);
+    document.getElementById('generateBtn').classList.toggle('hidden', current !== letters.length-1);
+    document.getElementById('progressFill').style.width = ((current+1)/letters.length*100)+'%';
+}
 
-// --- Font to Turtle Graphics Only ---
-let loadedFont = null;
-document.getElementById('fontUpload').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        opentype.load(event.target.result, function(err, font) {
-            if (err) {
-                alert('Font could not be loaded: ' + err);
-                loadedFont = null;
-                document.getElementById('fontName').textContent = '';
-            } else {
-                loadedFont = font;
-                document.getElementById('fontName').textContent = font.names.fullName.en || file.name;
+function drawGrid(grid) {
+    const gridDiv = document.getElementById('pixelGrid');
+    if (!grid) {
+        gridDiv.innerHTML = '';
+        gridDiv.style.display = 'none';
+        return;
+    }
+    gridDiv.style.display = 'grid';
+    gridDiv.innerHTML = '';
+    gridDiv.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 14px)`;
+    gridDiv.style.gridTemplateRows = `repeat(${GRID_SIZE}, 14px)`;
+    let isMouseDown = false;
+    gridDiv.onmousedown = () => { isMouseDown = true; };
+    gridDiv.onmouseup = () => { isMouseDown = false; };
+    gridDiv.onmouseleave = () => { isMouseDown = false; };
+    for (let y=0; y<GRID_SIZE; y++) for (let x=0; x<GRID_SIZE; x++) {
+        const cell = document.createElement('div');
+        cell.style.width = cell.style.height = '14px';
+        cell.style.border = '1px solid #eee';
+        cell.style.background = grid[y][x] ? '#333' : '#fff';
+        cell.style.cursor = 'pointer';
+        cell.addEventListener('mousedown', e => {
+            grid[y][x] = 1-grid[y][x];
+            cell.style.background = grid[y][x] ? '#333' : '#fff';
+        });
+        cell.addEventListener('mouseenter', e => {
+            if (isMouseDown) {
+                grid[y][x] = 1;
+                cell.style.background = '#333';
             }
         });
-    };
-    reader.readAsDataURL(file);
-});
-
-function getFontGlyphPaths(text, font, fontSize = 200) {
-    const paths = [];
-    let x = 0;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const char of text) {
-        const glyph = font.charToGlyph(char);
-        const glyphPath = glyph.getPath(x, fontSize, fontSize);
-        let currentPath = [];
-        for (const cmd of glyphPath.commands) {
-            if (cmd.type === 'M' || cmd.type === 'L' || cmd.type === 'Q' || cmd.type === 'C') {
-                currentPath.push({x: cmd.x, y: cmd.y});
-                if (cmd.x < minX) minX = cmd.x;
-                if (cmd.y < minY) minY = cmd.y;
-                if (cmd.x > maxX) maxX = cmd.x;
-                if (cmd.y > maxY) maxY = cmd.y;
-            } else if (cmd.type === 'Z') {
-                if (currentPath.length > 0) {
-                    paths.push(currentPath);
-                    currentPath = [];
-                }
-            }
-        }
-        if (currentPath.length > 0) paths.push(currentPath);
-        x += glyph.advanceWidth * (fontSize / font.unitsPerEm);
+        gridDiv.appendChild(cell);
     }
-    return { paths, minX, minY, maxX, maxY };
 }
 
-function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, minXShift = 0, minYShift = 0) {
-    const commands = [];
-    for (const path of paths) {
-        if (path.length > 0) {
-            const start = path[0];
-            commands.push(`    penup()`);
-            commands.push(`    goto(${Math.round(start.x * scale + offsetX + minXShift)}, ${Math.round(start.y * scale + offsetY + minYShift)})`);
-            commands.push(`    pendown()`);
-            for (let i = 1; i < path.length; i++) {
-                const pt = path[i];
-                commands.push(`    goto(${Math.round(pt.x * scale + offsetX + minXShift)}, ${Math.round(pt.y * scale + offsetY + minYShift)})`);
+function nextLetter() { current++; showLetter(); }
+function prevLetter() { current--; showLetter(); }
+function clearGrid() { grids[letters[current]] = Array(GRID_SIZE).fill().map(()=>Array(GRID_SIZE).fill(0)); showLetter(); }
+function resetApp() { location.reload(); }
+
+// --- Path Extraction for Turtle ---
+function extractPaths(grid) {
+    // Find all 1-pixels and group into continuous paths (4-connected)
+    const visited = Array(GRID_SIZE).fill().map(()=>Array(GRID_SIZE).fill(false));
+    const paths = [];
+    const dx = [0,1,0,-1], dy = [-1,0,1,0];
+    for (let y=0; y<GRID_SIZE; y++) {
+        for (let x=0; x<GRID_SIZE; x++) {
+            if (grid[y][x] && !visited[y][x]) {
+                // Start new path
+                const path = [];
+                const stack = [[x,y]];
+                visited[y][x] = true;
+                while (stack.length) {
+                    const [cx,cy] = stack.pop();
+                    path.push([cx,cy]);
+                    for (let d=0; d<4; d++) {
+                        const nx = cx+dx[d], ny = cy+dy[d];
+                        if (nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE && grid[ny][nx] && !visited[ny][nx]) {
+                            stack.push([nx,ny]);
+                            visited[ny][nx] = true;
+                        }
+                    }
+                }
+                paths.push(path);
             }
-            commands.push(`    penup()`);
         }
     }
-    return commands;
+    return paths;
+}
+
+function getAllLetterPaths() {
+    // For each unique letter, extract its paths
+    const letterPaths = {};
+    for (const l of Object.keys(grids)) {
+        letterPaths[l] = extractPaths(grids[l]);
+    }
+    return letterPaths;
+}
+
+function getBoundingBox(allPaths) {
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    for (const paths of Object.values(allPaths)) {
+        for (const path of paths) {
+            for (const [x,y] of path) {
+                if (x<minX) minX=x;
+                if (y<minY) minY=y;
+                if (x>maxX) maxX=x;
+                if (y>maxY) maxY=y;
+            }
+        }
+    }
+    return {minX, minY, maxX, maxY};
+}
+
+function scaleAndCenterPaths(allPaths, boxSize=350, margin=25) {
+    // Scale and center all paths to fit ColabTurtle window
+    const {minX, minY, maxX, maxY} = getBoundingBox(allPaths);
+    const width = maxX-minX+1, height = maxY-minY+1;
+    const scale = Math.min((boxSize-margin*2)/width, (boxSize-margin*2)/height);
+    const offsetX = (boxSize-width*scale)/2 - minX*scale + margin;
+    const offsetY = (boxSize-height*scale)/2 - minY*scale + margin;
+    const out = {};
+    for (const l in allPaths) {
+        out[l] = allPaths[l].map(path => path.map(([x,y]) => [
+            Math.round(x*scale+offsetX),
+            Math.round((GRID_SIZE-1-y)*scale+offsetY) // flip y for turtle
+        ]));
+    }
+    return out;
 }
 
 function generateCode() {
-    const name = document.getElementById('nameInput').value.trim();
-    if (!loadedFont) {
-        alert('Please upload a font file first!');
-        return;
-    }
-    if (!name) {
-        alert('Please enter a name!');
-        return;
-    }
-    let code = `!pip install ColabTurtle\n`;
-    code += `from ColabTurtle.Turtle import *\n`;
-    code += `import ColabTurtle.Turtle as t\n`;
-    code += `t.initializeTurtle(initial_speed=5)\n`;
-    code += `t.hideturtle()\n`;
-    code += `pensize(2)\n\n`;
-    // Get paths and bounding box
-    const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, loadedFont, 200);
-    // Centering offset
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    // Optionally scale to fit a 400x400 box (ColabTurtle default)
-    const width = maxX - minX;
-    const height = maxY - minY;
-    const scale = Math.min(350 / width, 350 / height, 1); // leave margin
-    // After centering, shift so minX/minY are 0 (or margin)
-    let shiftedMinX = Infinity, shiftedMinY = Infinity;
-    for (const path of paths) {
-        for (const pt of path) {
-            const sx = (pt.x - centerX) * scale;
-            const sy = (pt.y - centerY) * scale;
-            if (sx < shiftedMinX) shiftedMinX = sx;
-            if (sy < shiftedMinY) shiftedMinY = sy;
+    const letterPaths = getAllLetterPaths();
+    const scaledPaths = scaleAndCenterPaths(letterPaths);
+    let code = `!pip install ColabTurtle\nfrom ColabTurtle.Turtle import *\nimport ColabTurtle.Turtle as t\nt.initializeTurtle(initial_speed=5)\nt.hideturtle()\npensize(2)\n\n`;
+    for (const l of Object.keys(scaledPaths)) {
+        code += `def helper_${escapeLetter(l)}():\n`;
+        const paths = scaledPaths[l];
+        if (!paths.length) {
+            code += `    pass  # No drawing for this letter\n`;
+        } else {
+            for (const path of paths) {
+                if (path.length) {
+                    code += `    penup()\n`;
+                    code += `    goto(${path[0][0]}, ${path[0][1]})\n`;
+                    code += `    pendown()\n`;
+                    for (let i=1; i<path.length; i++) {
+                        code += `    goto(${path[i][0]}, ${path[i][1]})\n`;
+                    }
+                    code += `    penup()\n`;
+                }
+            }
         }
+        code += `\n`;
     }
-    const margin = 25;
-    const minXShift = -shiftedMinX + margin;
-    const minYShift = -shiftedMinY + margin;
-    const commands = fontPathsToTurtleCommands(paths, scale, -centerX * scale, -centerY * scale, minXShift, minYShift);
-    code += `def draw_name():\n`;
-    code += `    """Draw the name: ${name} centered in the window"""\n`;
-    if (commands.length === 0) {
-        code += `    pass  # No drawing data\n`;
-    } else {
-        for (const command of commands) {
-            code += `${command}\n`;
-        }
+    code += 'def helper(c):\n';
+    code += '    if False: pass\n';
+    for (const l of Object.keys(scaledPaths)) {
+        code += `    elif c == '${l}': helper_${escapeLetter(l)}()\n`;
     }
-    code += `\ndraw_name()\n`;
+    code += '\ndef draw_name():\n';
+    for (const l of letters) code += `    helper('${l}')\n`;
+    code += '\ndraw_name()\n';
     document.getElementById('generatedCode').textContent = code;
+    document.getElementById('drawingSection').classList.add('hidden');
     document.getElementById('codeSection').classList.remove('hidden');
 }
-
-function copyCode() {
-    const code = document.getElementById('generatedCode').textContent;
-    navigator.clipboard.writeText(code).then(() => {
-        alert('Code copied to clipboard!');
-    }).catch(() => {
-        alert('Failed to copy code. Please select and copy manually.');
-    });
-}
-
-function downloadCode() {
-    const code = document.getElementById('generatedCode').textContent;
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `turtle_drawing.py`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-function resetApp() {
-    document.getElementById('nameInput').value = '';
-    document.getElementById('generatedCode').textContent = '';
-    document.getElementById('codeSection').classList.add('hidden');
-}
+function escapeLetter(l) { return /^[a-zA-Z]$/.test(l) ? l : 'char'+l.charCodeAt(0); }
+function copyCode() { navigator.clipboard.writeText(document.getElementById('generatedCode').textContent); }
 // --- End ---

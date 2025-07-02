@@ -184,6 +184,11 @@ button:active {
     font-style: italic;
 }
 
+/* Drawing Section Visibility Fix */
+#drawingSection {
+    display: block;
+}
+
 /* Responsive Design */
 @media (max-width: 600px) {
     .container {

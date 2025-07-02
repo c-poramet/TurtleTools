@@ -3,27 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Font to Turtle Graphics Generator</title>
+    <title>Handwriting to Turtle Graphics Generator</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Add opentype.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/opentype.js@latest/dist/opentype.min.js"></script>
+    <script src="script.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Font to Turtle Graphics Generator</h1>
+        <h1>Handwriting to Turtle Graphics Generator</h1>
         
-        <!-- Font Upload Section -->
-        <div id="fontSection" style="margin-bottom: 20px;">
-            <label for="fontUpload">Upload .ttf Font: </label>
-            <input type="file" id="fontUpload" accept=".ttf,.otf" />
-            <span id="fontName" style="margin-left: 10px;"></span>
-        </div>
-
         <!-- Name Input Section -->
         <div id="nameSection" class="section">
             <h2>Enter Your Name</h2>
             <input type="text" id="nameInput" placeholder="Enter your name (English or Thai)">
-            <button onclick="generateCode()">Generate Code</button>
+            <button onclick="startDrawing()">Start Drawing</button>
+        </div>
+
+        <!-- Drawing Section -->
+        <div id="drawingSection" class="section hidden">
+            <div class="drawing-header">
+                <h2>Draw Letter: <span id="currentLetter"></span></h2>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <span id="progressText">0 / 0</span>
+                </div>
+            </div>
+            <div class="canvas-container">
+                <canvas id="drawingCanvas" width="500" height="500"></canvas>
+                <div class="grid-overlay" id="gridOverlay"></div>
+            </div>
+            <div class="controls">
+                <button onclick="clearCanvas()">Clear</button>
+                <button onclick="nextLetter()" id="nextBtn">Next Letter</button>
+                <button onclick="generateCode()" id="generateBtn" class="hidden">Generate Code</button>
+            </div>
         </div>
 
         <!-- Code Output Section -->
@@ -37,7 +51,5 @@
             <button onclick="resetApp()">Create Another</button>
         </div>
     </div>
-
-    <script src="script.js"></script>
 </body>
 </html>
