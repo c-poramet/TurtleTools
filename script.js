@@ -334,17 +334,23 @@ function getFontGlyphPaths(text, font, fontSize = 200) {
     return { paths, minX, minY, maxX, maxY };
 }
 
-function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, minXShift = 0, minYShift = 0) {
+function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0) {
     const commands = [];
     for (const path of paths) {
         if (path.length > 0) {
             const start = path[0];
+            const startX = Math.max(0, Math.round(start.x * scale + offsetX));
+            const startY = Math.max(0, Math.round(start.y * scale + offsetY));
+            
             commands.push(`    penup()`);
-            commands.push(`    goto(${Math.round(start.x * scale + offsetX)}, ${Math.round(-start.y * scale + offsetY)})`);
+            commands.push(`    goto(${startX}, ${startY})`);
             commands.push(`    pendown()`);
+            
             for (let i = 1; i < path.length; i++) {
                 const pt = path[i];
-                commands.push(`    goto(${Math.round(pt.x * scale + offsetX)}, ${Math.round(-pt.y * scale + offsetY)})`);
+                const x = Math.max(0, Math.round(pt.x * scale + offsetX));
+                const y = Math.max(0, Math.round(pt.y * scale + offsetY));
+                commands.push(`    goto(${x}, ${y})`);
             }
             commands.push(`    penup()`);
         }
@@ -375,29 +381,25 @@ function generateCode() {
     const textWidth = maxX - minX;
     const textHeight = maxY - minY;
     
-    // Scale to fit within a reasonable size (leaving margins)
+    // ColabTurtle uses 400x400 canvas with (0,0) at top-left
     const canvasWidth = 400;
     const canvasHeight = 400;
     const margin = 50;
     const availableWidth = canvasWidth - (2 * margin);
     const availableHeight = canvasHeight - (2 * margin);
     
+    // Scale to fit within available space
     const scale = Math.min(availableWidth / textWidth, availableHeight / textHeight, 1);
     
-    // Calculate final text dimensions after scaling
+    // Calculate scaled dimensions
     const scaledWidth = textWidth * scale;
     const scaledHeight = textHeight * scale;
     
-    // Center the text in the canvas
-    const startX = (canvasWidth - scaledWidth) / 2;
-    const startY = (canvasHeight - scaledHeight) / 2;
+    // Center the text by calculating offsets
+    const offsetX = (canvasWidth - scaledWidth) / 2 - minX * scale;
+    const offsetY = (canvasHeight - scaledHeight) / 2 - minY * scale;
     
-    // ColabTurtle uses screen coordinates with (0,0) at center
-    // Convert to ColabTurtle coordinate system
-    const centerOffsetX = startX - (canvasWidth / 2);
-    const centerOffsetY = (canvasHeight / 2) - startY - scaledHeight;
-    
-    const commands = fontPathsToTurtleCommands(paths, scale, -minX * scale + centerOffsetX, -minY * scale + centerOffsetY, 0, 0);
+    const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY);
     code += `def draw_name():\n`;
     code += `    """Draw the name: ${name} centered in the window"""\n`;
     if (commands.length === 0) {
