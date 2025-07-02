@@ -369,7 +369,6 @@ function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0, u
     if (useThickStrokes) {
         // Use thick pen width with thin font paths for filled effect
         commands.push(`    width(15)  # Thick stroke with thin font for filled effect`);
-        commands.push(`    color('black')`);
     }
     
     // Draw the paths normally (whether from regular or thin font)
