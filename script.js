@@ -360,6 +360,8 @@ function fontPathsToTurtleCommands(paths, scale = 1, offsetX = 0, offsetY = 0) {
 
 function generateCode() {
     const name = document.getElementById('nameInput').value.trim();
+    const useCustomSize = document.getElementById('customSizeCheckbox').checked;
+    
     if (!loadedFont) {
         alert('Font is still loading. Please wait a moment and try again.');
         return;
@@ -372,34 +374,70 @@ function generateCode() {
     // Get paths and bounding box first
     const { paths, minX, minY, maxX, maxY } = getFontGlyphPaths(name, loadedFont, 200);
     
-    // Calculate text dimensions
-    const textWidth = maxX - minX;
-    const textHeight = maxY - minY;
-    
-    // Add margin around the text
-    const margin = 50;
-    const canvasWidth = Math.max(400, Math.ceil(textWidth + (2 * margin)));
-    // Reduce height by using a smaller proportion of the text height for better visual balance
-    const canvasHeight = Math.max(300, Math.ceil(textHeight * 0.6 + (2 * margin)));
-    
     let code = `!pip install ColabTurtle\n`;
     code += `from ColabTurtle.Turtle import *\n`;
     code += `import ColabTurtle.Turtle as t\n`;
-    code += `# Set up canvas size to fit the name perfectly\n`;
-    code += `t.initializeTurtle(initial_window_size=(${canvasWidth}, ${canvasHeight}), initial_speed=13)\n`;
+    
+    let canvasWidth, canvasHeight, scale, offsetX, offsetY;
+    
+    if (useCustomSize) {
+        // Calculate text dimensions
+        const textWidth = maxX - minX;
+        const textHeight = maxY - minY;
+        
+        // Add margin around the text
+        const margin = 50;
+        canvasWidth = Math.max(400, Math.ceil(textWidth + (2 * margin)));
+        // Reduce height by using a smaller proportion of the text height for better visual balance
+        canvasHeight = Math.max(300, Math.ceil(textHeight * 0.6 + (2 * margin)));
+        
+        code += `# Set up custom canvas size to fit the name perfectly\n`;
+        code += `t.initializeTurtle(initial_window_size=(${canvasWidth}, ${canvasHeight}), initial_speed=13)\n`;
+        
+        // No scaling needed since canvas fits the text
+        scale = 1;
+        
+        // Center the text by calculating offsets
+        offsetX = margin - minX;
+        offsetY = margin - minY;
+    } else {
+        // Use default ColabTurtle canvas size (400x400)
+        canvasWidth = 400;
+        canvasHeight = 400;
+        const margin = 50;
+        const availableWidth = canvasWidth - (2 * margin);
+        const availableHeight = canvasHeight - (2 * margin);
+        
+        code += `# Using default ColabTurtle canvas size\n`;
+        code += `t.initializeTurtle(initial_speed=13)\n`;
+        
+        // Calculate text dimensions
+        const textWidth = maxX - minX;
+        const textHeight = maxY - minY;
+        
+        // Scale to fit within available space
+        scale = Math.min(availableWidth / textWidth, availableHeight / textHeight, 1);
+        
+        // Calculate scaled dimensions
+        const scaledWidth = textWidth * scale;
+        const scaledHeight = textHeight * scale;
+        
+        // Center the text by calculating offsets
+        offsetX = (canvasWidth - scaledWidth) / 2 - minX * scale;
+        offsetY = (canvasHeight - scaledHeight) / 2 - minY * scale;
+    }
+    
     code += `t.hideturtle()\n`;
     code += `pensize(2)\n\n`;
     
-    // No scaling needed since canvas fits the text
-    const scale = 1;
-    
-    // Center the text by calculating offsets
-    const offsetX = margin - minX;
-    const offsetY = margin - minY;
-    
     const commands = fontPathsToTurtleCommands(paths, scale, offsetX, offsetY);
     code += `def draw_name():\n`;
-    code += `    """Draw the name: ${name} (canvas: ${canvasWidth}x${canvasHeight})"""\n`;
+    
+    if (useCustomSize) {
+        code += `    """Draw the name: ${name} (custom canvas: ${canvasWidth}x${canvasHeight})"""\n`;
+    } else {
+        code += `    """Draw the name: ${name} (default canvas: 400x400, scaled: ${scale.toFixed(2)})"""\n`;
+    }
     if (commands.length === 0) {
         code += `    pass  # No drawing data\n`;
     } else {
