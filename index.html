@@ -3,55 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smooth Drawing to Turtle Graphics</title>
+    <title>TurtleTools - Drawing to Code Converter</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <h1>Smooth Drawing to Turtle Graphics</h1>
-        
+        <!-- Header -->
+        <header class="header">
+            <h1 class="title">🐢 TurtleTools</h1>
+            <p class="subtitle">Convert your handwriting to Google Colab Turtle code</p>
+        </header>
+
         <!-- Name Input Section -->
-        <div id="nameSection" class="section">
-            <h2>Enter Your Name</h2>
-            <p>Draw each letter smoothly, and we'll convert it to pixel-perfect turtle graphics!</p>
-            <input type="text" id="nameInput" placeholder="Enter your name">
-            <button onclick="startDrawing()">Start Drawing</button>
-        </div>
+        <section class="input-section" id="inputSection">
+            <div class="input-container">
+                <label for="nameInput" class="input-label">Enter your name:</label>
+                <input type="text" id="nameInput" class="name-input" placeholder="e.g., James Bond or สวัสดี">
+                <div class="language-toggle">
+                    <button class="lang-btn active" data-lang="en">English</button>
+                    <button class="lang-btn" data-lang="th">ไทย</button>
+                </div>
+                <button class="start-btn" id="startBtn">Start Drawing</button>
+            </div>
+        </section>
 
         <!-- Drawing Section -->
-        <div id="drawingSection" class="section hidden">
-            <div class="drawing-header">
-                <h2>Draw Letter: <span id="currentLetter"></span></h2>
-                <div class="progress-container">
-                    <div class="progress-bar">
-                        <div id="progressFill" class="progress-fill"></div>
-                    </div>
-                    <span id="progressText">1 / 1</span>
+        <section class="drawing-section hidden" id="drawingSection">
+            <div class="progress-container">
+                <div class="progress-info">
+                    <span class="current-letter" id="currentLetter">A</span>
+                    <span class="progress-text" id="progressText">Letter 1 of 5</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
                 </div>
             </div>
-            
-            <div class="canvas-container">
-                <canvas id="drawingCanvas"></canvas>
-            </div>
-            
-            <div class="controls">
-                <button onclick="prevLetter()" id="prevBtn">← Previous</button>
-                <button onclick="clearGrid()">Clear</button>
-                <button onclick="nextLetter()" id="nextBtn">Next →</button>
-                <button onclick="generateCode()" id="generateBtn" class="hidden">Generate Code</button>
-            </div>
-        </div>
 
-        <!-- Code Output Section -->
-        <div id="codeSection" class="section hidden">
-            <h2>Generated Python Code</h2>
-            <div class="code-container">
-                <pre id="generatedCode"></pre>
+            <div class="drawing-container">
+                <div class="canvas-wrapper">
+                    <canvas id="drawingCanvas" width="400" height="400"></canvas>
+                    <div class="grid-overlay" id="gridOverlay"></div>
+                </div>
+                <div class="drawing-controls">
+                    <button class="control-btn clear-btn" id="clearBtn">Clear</button>
+                    <button class="control-btn next-btn" id="nextBtn">Next Letter</button>
+                    <button class="control-btn prev-btn hidden" id="prevBtn">Previous</button>
+                </div>
             </div>
-            <button onclick="copyCode()">Copy Code</button>
-            <button onclick="downloadCode()">Download Code</button>
-            <button onclick="resetApp()">Create Another</button>
-        </div>
+        </section>
+
+        <!-- Code Generation Section -->
+        <section class="code-section hidden" id="codeSection">
+            <div class="code-container">
+                <h2 class="code-title">Generated Turtle Code</h2>
+                <div class="code-preview">
+                    <pre id="generatedCode"></pre>
+                </div>
+                <div class="code-actions">
+                    <button class="action-btn copy-btn" id="copyBtn">Copy to Clipboard</button>
+                    <button class="action-btn download-btn" id="downloadBtn">Download as .py</button>
+                    <button class="action-btn restart-btn" id="restartBtn">Start Over</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Instructions -->
+        <section class="instructions">
+            <h3>How to use:</h3>
+            <ol>
+                <li>Enter your name in English or Thai</li>
+                <li>Draw each letter in the 40×40 pixel grid</li>
+                <li>Use simple, clear strokes for best results</li>
+                <li>Copy the generated code to Google Colab</li>
+            </ol>
+        </section>
     </div>
 
     <script src="script.js"></script>
